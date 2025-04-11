@@ -1,69 +1,51 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const loginForm = document.getElementById("loginForm")
-  const messageElement = document.getElementById("loginMessage")
-  const backendUrl = "http://localhost:3000"
+// login.js (Actualizado para JWT)
+document.addEventListener('DOMContentLoaded', () => {
+  const loginForm = document.getElementById('loginForm')
+  const messageElement = document.getElementById('loginMessage')
+  const backendUrl = 'http://localhost:3000' // URL base del API
 
-  loginForm.addEventListener("submit", async (event) => {
-    event.preventDefault()
-    const username = document.getElementById("username").value
-    const password = document.getElementById("password").value
+  loginForm.addEventListener('submit', async (event) => {
+    console.log("heello")
+      event.preventDefault()
+      const username = document.getElementById('username').value
+      const password = document.getElementById('password').value
+      messageElement.textContent = ''
 
-    // Ocultar mensaje anterior
-    messageElement.style.display = "none"
-    messageElement.textContent = ""
+      if (!username || !password) { /* ... */ return }
 
-    if (!username || !password) {
-      messageElement.textContent = "Por favor completa todos los campos."
-      messageElement.style.display = "block"
-      return
-    }
+      try {
+          const response = await fetch(`${backendUrl}/login`, { // Ruta actualizada
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username, password })
+          })
 
-    try {
-      const response = await fetch(`${backendUrl}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      })
+          const data = await response.json()
 
-      const data = await response.json()
+          if (response.ok) { // Login exitoso, esperamos token
+              if (data.token) {
+                  // --- INICIO CAMBIOS JWT ---
+                  // Guardar el token JWT en localStorage
+                  localStorage.setItem('jwtToken', data.token)
+                  // Ya no guardamos userId directamente
+                  localStorage.removeItem('userId')
+                  // Podríamos guardar el username si queremos mostrarlo rápido,
+                  // pero es mejor obtenerlo del perfil protegido.
+                  localStorage.removeItem('username')
+                  // --- FIN CAMBIOS JWT ---
 
-      if (response.ok) {
-        // Login exitoso
-        localStorage.setItem("userId", data.userId)
-        localStorage.setItem("username", username)
-
-        // Mostrar mensaje de éxito brevemente antes de redirigir
-        messageElement.textContent = "¡Inicio de sesión exitoso! Redirigiendo..."
-        messageElement.classList.remove("error")
-        messageElement.classList.add("success")
-        messageElement.style.display = "block"
-
-        // Redirigir después de un breve retraso
-        setTimeout(() => {
-          window.location.href = "profile.html"
-        }, 1000)
-      } else {
-        // Error de login
-        messageElement.textContent = `Error: ${data.error || "Usuario o contraseña inválidos"}`
-        messageElement.classList.remove("success")
-        messageElement.classList.add("error")
-        messageElement.style.display = "block"
-
-        localStorage.removeItem("userId")
-        localStorage.removeItem("username")
+                 window.location.href = 'profile.html' // Redirigir al perfil
+              } else {
+                  messageElement.textContent = 'Error: No se recibió token del servidor.'
+              }
+          } else { // Error
+              messageElement.textContent = `Error: ${data.error || 'Usuario o contraseña inválidos'}`
+              localStorage.removeItem('jwtToken') // Limpiar token si falla
+          }
+      } catch (error) {
+          console.error('Error de login:', error)
+          messageElement.textContent = 'Login falló. Problema de red o del servidor.'
+          localStorage.removeItem('jwtToken')
       }
-    } catch (error) {
-      console.error("Error de login:", error)
-      messageElement.textContent =
-        "Error de conexión. Verifica tu conexión a internet o que el servidor esté funcionando."
-      messageElement.classList.remove("success")
-      messageElement.classList.add("error")
-      messageElement.style.display = "block"
-
-      localStorage.removeItem("userId")
-      localStorage.removeItem("username")
-    }
   })
 })
-
-

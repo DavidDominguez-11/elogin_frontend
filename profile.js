@@ -1,44 +1,93 @@
-document.addEventListener("DOMContentLoaded", async () => {
-  const usernameDisplay = document.getElementById("usernameDisplay")
-  const usernameDetail = document.getElementById("usernameDetail")
-  const userIdDisplay = document.getElementById("userIdDisplay")
-  const avatarInitial = document.getElementById("avatarInitial")
-  const logoutButton = document.getElementById("logoutButton")
-  const backendUrl = "http://localhost:3000"
+// profile.js (Actualizado para JWT)
+document.addEventListener('DOMContentLoaded', async () => {
+  const usernameDisplay = document.getElementById('usernameDisplay')
+  const userIdDisplay = document.getElementById('userIdDisplay') // Podemos quitar o dejar esto
+  const logoutButton = document.getElementById('logoutButton')
+  const backendUrl = 'http://localhost:3000'
 
-  // Verificar si hay sesión activa
-  const userId = localStorage.getItem("userId")
-  const username = localStorage.getItem("username")
+  // --- INICIO CAMBIOS JWT ---
+  // 1. Obtener el token de localStorage
+  const token = localStorage.getItem('jwtToken')
 
-  if (!userId) {
-    // No hay sesión, redirigir al login
-    alert("No has iniciado sesión. Redirigiendo al login...")
-    window.location.href = "index.html"
-    return
+  if (!token) {
+      // Si no hay token, redirigir a login
+      alert('No han iniciado sesión (no hay token). Redirigiendo...')
+      window.location.href = 'index.html'
+      return
   }
 
-  // Mostrar información del usuario
-  userIdDisplay.textContent = userId
-  usernameDisplay.textContent = username || "Usuario"
-  usernameDetail.textContent = username || "Usuario"
+  // 2. Intentar obtener los datos del perfil desde el endpoint protegido
+  try {
+      const response = await fetch(`${backendUrl}/users/profile`, { // Ruta protegida
+          method: 'GET',
+          headers: {
+              // ¡Enviar el token en el header Authorization!
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json' // Aunque GET no tiene body, es buena práctica
+          }
+      })
 
-  // Mostrar inicial del nombre de usuario en el avatar
-  if (username && username.length > 0) {
-    avatarInitial.textContent = username.charAt(0).toUpperCase()
-  } else {
-    avatarInitial.textContent = "U"
+      if (response.ok) {
+          const userData = await response.json()
+          // Mostrar datos obtenidos del backend
+          usernameDisplay.textContent = userData.username
+          userIdDisplay.textContent = userData.id // Mostrar ID si el elemento existe
+      } else {
+          // Si el token es inválido/expirado (401) u otro error
+          console.error('Error obteniendo perfil:', response.status, response.statusText)
+          const errorData = await response.json().catch(() => ({})) // Intentar leer error JSON
+          alert(`Error al cargar perfil: ${errorData.error || response.statusText}. Redirigiendo a login.`)
+          localStorage.removeItem('jwtToken') // Limpiar token inválido
+          window.location.href = 'index.html'
+          return
+      }
+
+  } catch (error) {
+      console.error('Error de red o fetch al obtener perfil:', error)
+      alert('Error de conexión al obtener perfil. Redirigiendo a login.')
+      localStorage.removeItem('jwtToken')
+      window.location.href = 'index.html'
+      return
   }
+  // --- FIN CAMBIOS JWT ---
 
-  // Configurar el botón de logout
-  logoutButton.addEventListener("click", () => {
-    // Limpiar localStorage
-    localStorage.removeItem("userId")
-    localStorage.removeItem("username")
+  // 3. Configurar el botón de Logout (ahora llama al backend)
+  logoutButton.addEventListener('click', async () => {
+      const currentToken = localStorage.getItem('jwtToken')
+      if (!currentToken) {
+          alert("Ya no hay sesión activa.")
+          window.location.href = 'index.html'
+          return
+      }
 
-    // Mostrar mensaje y redirigir
-    alert("Has cerrado sesión correctamente.")
-    window.location.href = "index.html"
+      try {
+          const response = await fetch(`${backendUrl}/auth/logout`, { // Ruta de logout
+              method: 'POST',
+              headers: {
+                  'Authorization': `Bearer ${currentToken}`, // Necesario para identificar qué token invalidar
+                  'Content-Type': 'application/json'
+              }
+              // No necesita body usualmente
+          })
+
+          const data = await response.json()
+
+          if (response.ok) {
+              alert(data.message || 'Logout exitoso.')
+          } else {
+              // Incluso si falla el backend, limpiar localmente
+              alert(`Logout completado localmente, pero hubo un problema notificando al servidor: ${data.error || response.statusText}`)
+          }
+
+      } catch (error) {
+          console.error('Error en fetch de logout:', error)
+          alert('Logout completado localmente, pero hubo un error de red al notificar al servidor.')
+      } finally {
+          // Siempre limpiar localStorage y redirigir
+          localStorage.removeItem('jwtToken')
+          localStorage.removeItem('username') // Limpiar cualquier otro dato guardado
+          localStorage.removeItem('userId')
+          window.location.href = 'index.html'
+      }
   })
 })
-
-
